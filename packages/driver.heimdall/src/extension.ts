@@ -2,7 +2,7 @@ import { IConnection, IExtension, IExtensionPlugin, IDriverExtensionApi } from '
 import { commands, ExtensionContext, extensions, window } from 'vscode';
 import { DRIVER_ALIASES } from './constants';
 import { needsConfirmation, statementAt } from './gate';
-import { CLEAR_METADATA, MetadataRequestParams, MetadataRequestResult, REFRESH_METADATA } from './ipc';
+import { CLEAR_METADATA, MetadataRequestParams, MetadataRequestResult, REFRESH_METADATA, TARGET_MISMATCH, TargetMismatchParams } from './ipc';
 const { publisher, name } = require('../package.json');
 
 const driverName = 'Heimdall';
@@ -165,6 +165,15 @@ export async function activate(extContext: ExtensionContext): Promise<IDriverExt
         CLEAR_METADATA,
         'clear metadata failed',
       );
+
+      // US-2/FR-2: loud, un-scrollable-past notification on a real target
+      // mismatch — sent from `ls/driver.ts`'s `query()` (see `./ipc.ts`).
+      // Plain error toast, not modal (US-2 doesn't ask for modal). The
+      // merely-`unverified` state never sends this notification at all, so
+      // there is nothing to filter here.
+      extension.client.onNotification(TARGET_MISMATCH, (params: TargetMismatchParams) => {
+        void window.showErrorMessage(`Heimdall: ${params.message}`);
+      });
     }
   };
   api.registerPlugin(plugin);

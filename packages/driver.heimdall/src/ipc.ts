@@ -50,6 +50,24 @@ export const REFRESH_METADATA = 'heimdall/refreshMetadata';
 export const CLEAR_METADATA = 'heimdall/clearMetadata';
 
 /**
+ * LS -> ext, one-way. US-2/FR-2: raised from inside `driver.ts`'s `query()`
+ * the moment `verifyResolvedTarget` reports `state === 'mismatch'` — the
+ * merely-`unverified` state stays `messages`-only and never sends this (don't
+ * cry wolf on "couldn't confirm"). Carries nothing beyond what
+ * `heimdall/targets.ts`'s `TargetVerification` already computes for the
+ * mismatch case.
+ */
+export const TARGET_MISMATCH = 'heimdall/targetMismatch';
+
+/** Params for `TARGET_MISMATCH` — the mismatch-case fields of `TargetVerification`. */
+export interface TargetMismatchParams {
+  /** `verifyResolvedTarget`'s human-readable explanation; always set for a mismatch. */
+  message: string;
+  expected: { command: string; cluster: string };
+  actual: { command?: string; cluster?: string };
+}
+
+/**
  * Params for both metadata requests.
  *
  * `connId` identifies which connection's driver instance to act on — the LS

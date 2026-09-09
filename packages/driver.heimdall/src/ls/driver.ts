@@ -29,7 +29,7 @@ import { isReadOnly, isSessionStatement, injectLimit } from '../heimdall/safety'
 import { annotateResult } from '../results/annotate';
 import explorerQueries, { quoteSpark, kyuubiShowNamespaces, kyuubiShowTables } from '../explorer/queries';
 import { MetadataCacheStore, MemoryCacheStorage, columnValues, CACHE_FORMAT_VERSION, NamespaceTables } from '../explorer/metadataCache';
-import { MetadataRequestResult } from '../ipc';
+import { MetadataRequestResult, TARGET_MISMATCH, TargetMismatchParams } from '../ipc';
 
 /** Mirrors `safety.ts`'s own fallback (not exported — see that file's header note on why). */
 const DEFAULT_MAX_ROWS = 1000;
@@ -65,6 +65,18 @@ export default class HeimdallDriver extends AbstractDriver<HeimdallClient, IHeim
 
   static getInstance(connId: string): HeimdallDriver | undefined {
     return HeimdallDriver.instances.get(connId);
+  }
+
+  /**
+   * UoW-05: the LS `server` handed in by `ls/plugin.ts`'s `register(server)`
+   * — the only thing this class needs from it is `sendNotification`, so the
+   * type is kept to that rather than importing SQLTools' full LS server type
+   * into this file.
+   */
+  private static server: { sendNotification(method: string, params: unknown): void } | undefined;
+
+  static setServer(server: { sendNotification(method: string, params: unknown): void }): void {
+    HeimdallDriver.server = server;
   }
 
   /** Additive: registers this instance for the IPC lookup above. */
@@ -226,6 +238,16 @@ export default class HeimdallDriver extends AbstractDriver<HeimdallClient, IHeim
       const verification = verifyResolvedTarget(resolved, job);
       if (verification.state === 'mismatch') {
         warnings.push(verification.message!);
+        // US-2/FR-2: also push a notification the ext host can turn into a
+        // real, un-scrollable-past `showErrorMessage` — the `messages` entry
+        // above is easy to miss inline in the results grid. `unverified`
+        // deliberately does not reach here (messages-only, matches the
+        // reference extension — don't cry wolf on "couldn't confirm").
+        HeimdallDriver.server?.sendNotification(TARGET_MISMATCH, <TargetMismatchParams>{
+          message: verification.message!,
+          expected: verification.expected,
+          actual: verification.actual,
+        });
       }
 
       resultsAgg.push(<NSDatabase.IResult>{
