@@ -22,7 +22,7 @@
       "default": "cookie-file"
     }
   },
-  "required": ["name", "target", "authMode"],
+  "required": ["target", "authMode"],
   "dependencies": {
     "authMode": {
       "oneOf": [
