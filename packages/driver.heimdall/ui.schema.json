@@ -1,0 +1,4 @@
+{
+  "ui:order": ["name", "target", "authMode", "authHeader"],
+  "authHeader": { "ui:widget": "password" }
+}

@@ -22,6 +22,7 @@
   ],
   "scripts": {
     "test:tsc": "yarn workspaces run test:tsc",
+    "build:heimdall": "cd packages/driver.heimdall && yarn package",
     "build": "yarn --cwd ./build-tools run build",
     "docs:build": "yarn --cwd ./docs run docz:build",
     "docs:dev": "yarn --cwd ./docs run docz:dev",

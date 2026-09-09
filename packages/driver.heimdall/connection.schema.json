@@ -1,0 +1,47 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "name": {
+      "title": "Connection name",
+      "description": "A label you choose for this connection — not a hostname. Heimdall's URL is fixed and never configured here.",
+      "type": "string",
+      "minLength": 1,
+      "default": "Heimdall"
+    },
+    "target": {
+      "title": "Target",
+      "type": "string",
+      "enum": ["kyuubi", "spark-eks"],
+      "default": "kyuubi"
+    },
+    "authMode": {
+      "title": "Auth mode",
+      "type": "string",
+      "enum": ["cookie-file", "service-token"],
+      "default": "cookie-file"
+    }
+  },
+  "required": ["name", "target", "authMode"],
+  "dependencies": {
+    "authMode": {
+      "oneOf": [
+        {
+          "properties": {
+            "authMode": { "enum": ["cookie-file"] }
+          },
+          "description": "Reads the Gatekeeper cookie file automatically (~/.pattern/gatekeeper/heimdall.json or /etc/gatekeeper/heimdall.json) — nothing to type in."
+        },
+        {
+          "properties": {
+            "authMode": { "enum": ["service-token"] },
+            "authHeader": {
+              "title": "Service token (optional — falls back to PATTERN__HEIMDALL_TOKEN)",
+              "type": "string"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

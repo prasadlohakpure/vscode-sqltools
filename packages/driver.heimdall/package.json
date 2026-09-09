@@ -1,0 +1,111 @@
+{
+  "name": "sqltools-driver-heimdall",
+  "displayName": "SQLTools Heimdall",
+  "description": "SQLTools driver that routes queries through Pattern's Heimdall service (Spark SQL via Kyuubi/spark-eks)",
+  "version": "0.0.1-SNAPSHOT",
+  "engines": {
+    "vscode": "^1.78.0"
+  },
+  "publisher": "pattern",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/prasadlohakpure/vscode-sqltools.git",
+    "directory": "packages/driver.heimdall"
+  },
+  "keywords": [
+    "sqltools-driver",
+    "heimdall",
+    "spark"
+  ],
+  "galleryBanner": {
+    "theme": "light",
+    "color": "#eaeaea"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Formatters",
+    "Other"
+  ],
+  "extensionDependencies": [
+    "mtxr.sqltools"
+  ],
+  "activationEvents": [
+    "*",
+    "onLanguage:sql",
+    "onCommand:sqltools.*"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "title": "Run Current Query (safety gate)",
+        "command": "sqltools-driver-heimdall.executeCurrentQuery",
+        "category": "Heimdall"
+      },
+      {
+        "title": "Run Selected Query (safety gate)",
+        "command": "sqltools-driver-heimdall.executeQuery",
+        "category": "Heimdall"
+      },
+      {
+        "title": "Refresh Metadata Cache",
+        "command": "sqltools-driver-heimdall.refreshMetadata",
+        "category": "Heimdall"
+      },
+      {
+        "title": "Clear Metadata Cache",
+        "command": "sqltools-driver-heimdall.clearMetadata",
+        "category": "Heimdall"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "sqltools-driver-heimdall.executeCurrentQuery",
+        "key": "ctrl+e ctrl+e",
+        "mac": "cmd+e cmd+e",
+        "when": "editorTextFocus && !editorHasSelection"
+      },
+      {
+        "command": "sqltools-driver-heimdall.executeQuery",
+        "key": "ctrl+e ctrl+e",
+        "mac": "cmd+e cmd+e",
+        "when": "editorTextFocus && editorHasSelection"
+      }
+    ]
+  },
+  "scripts": {
+    "test": "yarn --cwd ../.. run dev:jest packages/driver.heimdall",
+    "test:tsc": "tsc --noEmit -p ./tsconfig.json --skipLibCheck",
+    "clean": "rimraf -rf out dist *.vsix",
+    "predev": "yarn run clean",
+    "dev": "yarn run watch",
+    "prebuild": "yarn run clean && yarn run tsc-check",
+    "build": "cross-env NODE_ENV=production concurrently \"npm:build:*\"",
+    "build:ext": "yarn run compile:ext --define:process.env.NODE_ENV=\"'production'\" --minify",
+    "build:ls": "yarn run compile:ls --define:process.env.NODE_ENV=\"'production'\" --minify",
+    "esbuild": "esbuild --platform=node --tsconfig=./tsconfig.json --external:vscode --color=true --format=cjs --loader:.node=file",
+    "prepackage": "yarn run build",
+    "package": "vsce package --yarn -o .",
+    "compile:ext": "yarn run esbuild --bundle ./src/extension.ts --outfile=./out/extension.js --target=es2017 --define:process.env.PRODUCT=\"'ext'\"",
+    "compile:ls": "yarn run esbuild --bundle ./src/ls/plugin.ts --outfile=./out/ls/plugin.js --target=es2015 --define:process.env.PRODUCT=\"'ls'\"",
+    "tsc-check": "yarn run ts --noEmit --preserveWatchOutput --skipLibCheck",
+    "watch": "concurrently \"npm:watch:*\"",
+    "watch:ext": "yarn run compile:ext --define:process.env.NODE_ENV=\"'development'\" --sourcemap --watch",
+    "watch:ls": "yarn run compile:ls --define:process.env.NODE_ENV=\"'development'\" --sourcemap --watch",
+    "dev:tsc": "yarn run tsc-check -w",
+    "ts": "tsc -p ."
+  },
+  "devDependencies": {
+    "@sqltools/base-driver": "^0.2.2",
+    "@types/vscode": "^1.72.0",
+    "concurrently": "^5.2.0",
+    "cross-env": "^7.0.2",
+    "esbuild": "^0.28.1",
+    "rimraf": "^3.0.2",
+    "typescript": "~4.8.3",
+    "@vscode/vsce": "^2.19.0"
+  }
+}
