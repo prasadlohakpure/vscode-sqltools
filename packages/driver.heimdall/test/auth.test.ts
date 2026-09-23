@@ -95,7 +95,7 @@ test('NFR-12: 3xx, 401 and 403 all classify as auth failure; 2xx/4xx-other/5xx d
     assert.equal(isAuthFailure(s), false, `${s} should not be an auth failure`);
   }
   assert.throws(() => assertAuthOk({ status: 302 }), /Okta login redirect/);
-  assert.throws(() => assertAuthOk({ status: 401 }), /mise run agent-sandbox:auth/);
+  assert.throws(() => assertAuthOk({ status: 401 }), /cookie-monster/);
   assert.doesNotThrow(() => assertAuthOk({ status: 200 }));
 });
 
@@ -118,7 +118,7 @@ test('staleness from when_created', () => {
   });
   const auth = resolveAuth({ now, cookieFiles: [path] });
   assert.match(auth.staleWarning || '', /9\.0 days old/);
-  assert.match(auth.staleWarning || '', /mise run agent-sandbox:auth/);
+  assert.match(auth.staleWarning || '', /cookie-monster/);
 });
 
 test('missing credentials produce an actionable error, remote-aware', () => {
@@ -126,7 +126,7 @@ test('missing credentials produce an actionable error, remote-aware', () => {
 
   const local = grab(() => resolveAuth({ cookieFiles: absent }));
   assert.match(local.message, /No Heimdall credentials found/);
-  assert.match(local.message, /mise run agent-sandbox:auth/);
+  assert.match(local.message, /cookie-monster/);
   assert.match(local.message, /PATTERN__HEIMDALL_TOKEN/);
   assert.doesNotMatch(local.message, /remote workspace/);
 

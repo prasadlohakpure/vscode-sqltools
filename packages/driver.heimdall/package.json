@@ -59,19 +59,24 @@
         "title": "Clear Metadata Cache",
         "command": "sqltools-driver-heimdall.clearMetadata",
         "category": "Heimdall"
+      },
+      {
+        "title": "Refresh Gatekeeper Cookie",
+        "command": "sqltools-driver-heimdall.refreshCookie",
+        "category": "Heimdall"
       }
     ],
     "keybindings": [
       {
         "command": "sqltools-driver-heimdall.executeCurrentQuery",
-        "key": "ctrl+e ctrl+e",
-        "mac": "cmd+e cmd+e",
+        "key": "ctrl+enter",
+        "mac": "cmd+enter",
         "when": "editorTextFocus && !editorHasSelection"
       },
       {
         "command": "sqltools-driver-heimdall.executeQuery",
-        "key": "ctrl+e ctrl+e",
-        "mac": "cmd+e cmd+e",
+        "key": "ctrl+enter",
+        "mac": "cmd+enter",
         "when": "editorTextFocus && editorHasSelection"
       }
     ]

@@ -24,10 +24,15 @@ export default function prepareSchema(
       },
       driver: { title: 'driver', type: 'string' },
       ...(schema.properties || {}),
+      // A driver's own `previewLimit` in its connection.schema.json (e.g. a
+      // different default) wins over this fallback — merged, not overwritten,
+      // so a driver overriding only `default` still gets `type`/`title` for
+      // free. Drivers that declare nothing here keep the historical default.
       previewLimit: {
         default: 50,
         type: 'number',
         title: 'Show records default limit',
+        ...(typeof schema.properties?.previewLimit === 'object' ? schema.properties.previewLimit : {}),
       },
     },
     required: ['name', 'driver', ...(schema.required || [])],

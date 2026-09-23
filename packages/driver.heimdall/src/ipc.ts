@@ -59,6 +59,25 @@ export const CLEAR_METADATA = 'heimdall/clearMetadata';
  */
 export const TARGET_MISMATCH = 'heimdall/targetMismatch';
 
+/**
+ * LS -> ext, one-way. Raised from `driver.ts`'s `buildAuth()` whenever the
+ * Gatekeeper cookie chain yields nothing usable. `extension.ts`'s own
+ * `cookieStatus()` pre-checks only cover the commands it wraps or hooks;
+ * connecting (`open()`), tree expansion and metadata all reach `buildAuth()`
+ * through paths with no such pre-check, where the missing cookie surfaced as
+ * nothing but core SQLTools' "Error opening connection" toast. This lets the
+ * one place that actually detects the problem trigger the refresh.
+ */
+export const COOKIE_REFRESH_REQUIRED = 'heimdall/cookieRefreshRequired';
+
+/** Params for `COOKIE_REFRESH_REQUIRED`. Paths and reasons only — never cookie values. */
+export interface CookieRefreshParams {
+  /** `missing` — no candidate file exists. `unusable` — a file exists but can't be parsed or holds no cookies. `stale` — older than `COOKIE_MAX_AGE_DAYS`. */
+  reason: 'missing' | 'unusable' | 'stale';
+  /** The offending file, when one was found. */
+  path?: string;
+}
+
 /** Params for `TARGET_MISMATCH` — the mismatch-case fields of `TargetVerification`. */
 export interface TargetMismatchParams {
   /** `verifyResolvedTarget`'s human-readable explanation; always set for a mismatch. */

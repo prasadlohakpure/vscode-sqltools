@@ -41,7 +41,19 @@ export interface ResolveOptions {
 /** Cookies go stale at roughly a week; there is no refresh-token path (§10). */
 export const COOKIE_MAX_AGE_DAYS = 7;
 
-const REFRESH_CMD = 'mise run agent-sandbox:auth';
+/**
+ * Bug fix: was `mise run agent-sandbox:auth` — that's a thin `data-airflow`
+ * repo task wrapper (`mkdir -p ~/.pattern/gatekeeper && cookie-monster`,
+ * checked in that repo's `.mise.toml`) around the real tool, `cookie-monster`
+ * itself, a standalone binary on `$PATH`. `mise` proved unreliable to invoke
+ * from an automated terminal (not found in at least one shell context this
+ * session hit), and the repo/cwd it wrapped was never actually needed —
+ * `cookie-monster` runs from anywhere. Calling it directly removes both the
+ * `mise`-availability dependency and the now-pointless data-airflow-repo
+ * requirement. Exported so `extension.ts`'s cookie-refresh prompt runs the
+ * exact same command, never a duplicated string.
+ */
+export const REFRESH_CMD = 'mkdir -p "$HOME/.pattern/gatekeeper" && cookie-monster';
 
 /** Lookup order from requirements.md §10. */
 export function cookieFileCandidates(): string[] {
@@ -130,7 +142,7 @@ export function resolveAuth(opts: ResolveOptions = {}): AuthHeaders {
     try {
       parsed = JSON.parse(raw);
     } catch {
-      throw new Error(`${path} is not valid JSON. Re-create it: run \`${REFRESH_CMD}\` in the data-airflow repo.`);
+      throw new Error(`${path} is not valid JSON. Re-create it: run \`${REFRESH_CMD}\`.`);
     }
 
     const cookie = buildCookieHeader(parsed.cookies ?? {});
@@ -147,7 +159,7 @@ export function resolveAuth(opts: ResolveOptions = {}): AuthHeaders {
         ? {
             staleWarning:
               `Gatekeeper cookies in ${path} are ${age.toFixed(1)} days old (stale after ~${COOKIE_MAX_AGE_DAYS}). ` +
-              `Queries will likely fail — run \`${REFRESH_CMD}\` in the data-airflow repo.`,
+              `Queries will likely fail — run \`${REFRESH_CMD}\`.`,
           }
         : {}),
     };
@@ -168,7 +180,7 @@ export function resolveAuth(opts: ResolveOptions = {}): AuthHeaders {
  */
 export function authFixes(opts: ResolveOptions = {}): string {
   const lines = [
-    `Fix (laptop): run \`${REFRESH_CMD}\` in the data-airflow repo — it wraps cookie-monster, which opens a browser for Okta.`,
+    `Fix (laptop): run \`${REFRESH_CMD}\` — opens a browser for Okta.`,
     'Fix (headless): set PATTERN__HEIMDALL_TOKEN, plus PATTERN__HEIMDALL_USER so jobs are attributed to you and not the bare service account.',
   ];
   if (opts.remoteName) {

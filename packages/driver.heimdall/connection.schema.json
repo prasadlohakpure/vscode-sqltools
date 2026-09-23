@@ -17,31 +17,16 @@
     },
     "authMode": {
       "title": "Auth mode",
+      "description": "Only mode supported: reads the Gatekeeper cookie file automatically (~/.pattern/gatekeeper/heimdall.json or /etc/gatekeeper/heimdall.json) — nothing to type in. Hidden from the form, see ui.schema.json.",
       "type": "string",
-      "enum": ["cookie-file", "service-token"],
+      "enum": ["cookie-file"],
       "default": "cookie-file"
+    },
+    "previewLimit": {
+      "title": "Show records default limit",
+      "type": "number",
+      "default": 1000
     }
   },
-  "required": ["target", "authMode"],
-  "dependencies": {
-    "authMode": {
-      "oneOf": [
-        {
-          "properties": {
-            "authMode": { "enum": ["cookie-file"] }
-          },
-          "description": "Reads the Gatekeeper cookie file automatically (~/.pattern/gatekeeper/heimdall.json or /etc/gatekeeper/heimdall.json) — nothing to type in."
-        },
-        {
-          "properties": {
-            "authMode": { "enum": ["service-token"] },
-            "authHeader": {
-              "title": "Service token (optional — falls back to PATTERN__HEIMDALL_TOKEN)",
-              "type": "string"
-            }
-          }
-        }
-      ]
-    }
-  }
+  "required": ["target", "authMode"]
 }

@@ -1,0 +1,179 @@
+{
+  "name": "sqltools-charts",
+  "displayName": "SQLTools Charts & Query Output",
+  "description": "Query output panel, rich result grid, file bookmarks, and charts for SQLTools query results, driver-agnostic.",
+  "version": "0.2.0",
+  "engines": {
+    "vscode": "^1.78.0"
+  },
+  "publisher": "pattern",
+  "license": "MIT",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mtxr/vscode-sqltools.git",
+    "directory": "packages/sqltools-charts"
+  },
+  "categories": [
+    "Other"
+  ],
+  "extensionDependencies": [
+    "mtxr.sqltools"
+  ],
+  "activationEvents": [
+    "*"
+  ],
+  "main": "./out/extension.js",
+  "scripts": {
+    "test:tsc": "tsc --noEmit -p ./tsconfig.json --skipLibCheck",
+    "test": "node out-test/test/capture.test.js",
+    "clean": "rimraf -rf out out-test *.vsix",
+    "prebuild": "yarn run clean",
+    "build": "cross-env NODE_ENV=production concurrently \"npm:build:*\"",
+    "build:ext": "yarn run compile:ext --define:process.env.NODE_ENV=\"'production'\" --minify",
+    "build:webview": "yarn run compile:webview --minify",
+    "build:output-webview": "yarn run compile:output-webview --minify",
+    "build:output-css": "yarn run compile:output-css --minify",
+    "esbuild": "esbuild --platform=node --tsconfig=./tsconfig.json --external:vscode --color=true --format=cjs",
+    "compile:ext": "yarn run esbuild --bundle ./src/extension.ts --outfile=./out/extension.js --target=es2017",
+    "compile:webview": "esbuild --bundle ./src/chart/webview-entry.ts --outfile=./out/chart-webview.js --target=es2017 --format=iife",
+    "compile:output-webview": "esbuild --bundle ./src/output/webview-entry.ts --outfile=./out/output-webview.js --target=es2017 --format=iife",
+    "compile:output-css": "esbuild --bundle tabulator-tables/dist/css/tabulator_simple.min.css --outfile=./out/output-webview.css",
+    "watch": "concurrently \"npm:watch:*\"",
+    "watch:ext": "yarn run compile:ext --define:process.env.NODE_ENV=\"'development'\" --sourcemap --watch",
+    "watch:webview": "yarn run compile:webview --sourcemap --watch",
+    "watch:output-webview": "yarn run compile:output-webview --sourcemap --watch",
+    "watch:output-css": "yarn run compile:output-css --watch",
+    "prepackage": "yarn run build",
+    "package": "vsce package --yarn -o .",
+    "pretest": "yarn run esbuild --bundle ./src/test/capture.test.ts --outfile=./out-test/test/capture.test.js --target=es2017"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.0",
+    "tabulator-tables": "^6.2.1"
+  },
+  "devDependencies": {
+    "@sqltools/types": "*",
+    "@sqltools/util": "*",
+    "@types/vscode": "^1.72.0",
+    "concurrently": "^5.2.0",
+    "cross-env": "^7.0.2",
+    "esbuild": "^0.28.1",
+    "rimraf": "^3.0.2",
+    "typescript": "~4.8.3",
+    "@vscode/vsce": "^2.19.0"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "sqltools-charts.chartLastResult",
+        "title": "Chart Last Result",
+        "category": "SQLTools Charts"
+      },
+      {
+        "command": "sqltools-charts.clearOutput",
+        "title": "Clear Query Output",
+        "category": "SQLTools Charts",
+        "icon": "$(clear-all)"
+      },
+      {
+        "command": "sqltools-charts.openResult",
+        "title": "Open Result",
+        "category": "SQLTools Charts"
+      },
+      {
+        "command": "sqltools-charts.chartResult",
+        "title": "Chart This Result",
+        "category": "SQLTools Charts",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "sqltools-charts.bookmarkFile",
+        "title": "Bookmark Current File",
+        "category": "SQLTools Charts",
+        "icon": "$(bookmark)"
+      },
+      {
+        "command": "sqltools-charts.openFileBookmark",
+        "title": "Open File Bookmark",
+        "category": "SQLTools Charts"
+      },
+      {
+        "command": "sqltools-charts.removeFileBookmark",
+        "title": "Remove File Bookmark",
+        "category": "SQLTools Charts",
+        "icon": "$(dash)"
+      },
+      {
+        "command": "sqltools-charts.clearFileBookmarks",
+        "title": "Clear File Bookmarks",
+        "category": "SQLTools Charts",
+        "icon": "$(clear-all)"
+      }
+    ],
+    "viewsContainers": {
+      "panel": [
+        {
+          "id": "sqltoolsChartsPanelContainer",
+          "title": "Query Output",
+          "icon": "$(output)"
+        }
+      ]
+    },
+    "views": {
+      "sqltoolsChartsPanelContainer": [
+        {
+          "id": "sqltoolsChartsViewOutput",
+          "name": "Query Output"
+        }
+      ],
+      "sqltoolsActivityBarContainer": [
+        {
+          "id": "sqltoolsChartsViewFileBookmarks",
+          "name": "File Bookmarks"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "sqltools-charts.clearOutput",
+          "when": "view == sqltoolsChartsViewOutput",
+          "group": "navigation@1"
+        },
+        {
+          "command": "sqltools-charts.chartLastResult",
+          "when": "view == sqltoolsChartsViewOutput",
+          "group": "navigation@0"
+        },
+        {
+          "command": "sqltools-charts.bookmarkFile",
+          "when": "view == sqltoolsChartsViewFileBookmarks",
+          "group": "navigation@0"
+        },
+        {
+          "command": "sqltools-charts.clearFileBookmarks",
+          "when": "view == sqltoolsChartsViewFileBookmarks",
+          "group": "navigation@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "sqltools-charts.openResult",
+          "when": "view == sqltoolsChartsViewOutput && viewItem == output.item",
+          "group": "inline@0"
+        },
+        {
+          "command": "sqltools-charts.chartResult",
+          "when": "view == sqltoolsChartsViewOutput && viewItem == output.item",
+          "group": "inline@1"
+        },
+        {
+          "command": "sqltools-charts.removeFileBookmark",
+          "when": "view == sqltoolsChartsViewFileBookmarks && viewItem == filebookmark.item",
+          "group": "inline@0"
+        }
+      ]
+    }
+  }
+}

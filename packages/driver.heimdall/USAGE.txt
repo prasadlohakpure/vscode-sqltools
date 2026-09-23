@@ -1,0 +1,66 @@
+HEIMDALL SQLTOOLS DRIVER — USAGE GUIDE
+=======================================
+
+1. CONNECT
+
+   - Click the SQLTools icon in the activity bar.
+   - Click "Add New Connection" -> choose "Heimdall".
+   - Name it whatever you want (just a label, not a hostname).
+   - Pick a Target: "kyuubi" (interactive, fast) or "spark-eks" (batch,
+     slower cold start).
+   - Nothing to type for auth — it reads your Gatekeeper cookie file
+     automatically. Generate it using cookie-monster utility.
+   - Save, then click the connection in the sidebar to actually connect
+     (saving alone does not connect it).
+
+2. RUN A QUERY
+
+   - Open or create a .sql file.
+   - Pick your Heimdall connection from the connection dropdown/status bar.
+   - Select a statement, or just place your cursor in one, and run it:
+       Cmd+Enter — Mac
+       Ctrl+Enter — Windows/Linux
+     or Command Palette -> "Heimdall: Run Current Query (safety gate)" /
+     "Heimdall: Run Selected Query (safety gate)".
+   - Only read-only statements run (SELECT / SHOW / DESCRIBE / EXPLAIN /
+     WITH). Anything else is blocked before it reaches Heimdall — you'll
+     see a clear "blocked" message instead of results.
+   - A SELECT/WITH with no LIMIT automatically gets LIMIT 1000 added.
+   - Note: if you also have the "MySQL" (cweijan) extension installed, it
+     binds the same Cmd+Enter for .sql files with a selection — VS Code
+     doesn't guarantee which one fires. Use the Command Palette entry
+     instead, or rebind one of the two in your own keybindings.json, if it
+     misfires.
+
+3. BROWSE TABLES
+
+   - Expand your connection in the sidebar: Databases -> Tables -> Columns.
+   - Re-expanding something you already opened is instant (cached) —
+     it doesn't hit Heimdall again.
+   - Command Palette -> "Heimdall: Refresh Metadata Cache" to force a
+     re-crawl (e.g. after a new table was created).
+   - Command Palette -> "Heimdall: Clear Metadata Cache" to wipe it.
+
+4. QUERY OUTPUT + CHARTS (works for ANY connection, not just Heimdall)
+
+   - "Query Output" panel in the SQLTools sidebar lists every query you've
+     run: query text, how long it took, success/failure, row count.
+   - Click a row to see the full result in a table.
+   - Click the chart icon on a row (or Command Palette ->
+     "SQLTools Charts: Chart This Result" / "...Chart Last Result") to plot
+     it. Pick chart type and columns from the dropdowns at the top of the
+     chart — it re-draws instantly, no re-running the query.
+
+5. BOOKMARKS & HISTORY (built into SQLTools, works automatically)
+
+   - Select a query, Command Palette -> "Bookmark Selection" to save it.
+   - "Bookmarks" and "History" panels in the sidebar let you re-run or
+     edit anything you've bookmarked or previously executed.
+
+6. IF SOMETHING'S WRONG
+
+   - Output panel (bottom) -> switch the dropdown to "SQLTools" (not
+     "Tasks" or whatever's showing by default) — real errors land there.
+   - Warnings about a query (e.g. "ran on a different cluster than
+     expected") show inline with the results, or as a popup for anything
+     serious.

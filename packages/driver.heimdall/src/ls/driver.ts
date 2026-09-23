@@ -24,12 +24,12 @@ import {
   TargetResolutionError,
   CatalogItem,
 } from '../heimdall/targets';
-import { cookieFileCandidates, buildCookieHeader, cookieAgeDays, COOKIE_MAX_AGE_DAYS } from '../heimdall/auth';
+import { cookieFileCandidates, buildCookieHeader, cookieAgeDays, COOKIE_MAX_AGE_DAYS, REFRESH_CMD } from '../heimdall/auth';
 import { isReadOnly, isSessionStatement, injectLimit } from '../heimdall/safety';
 import { annotateResult } from '../results/annotate';
 import explorerQueries, { quoteSpark, kyuubiShowNamespaces, kyuubiShowTables } from '../explorer/queries';
 import { MetadataCacheStore, MemoryCacheStorage, columnValues, CACHE_FORMAT_VERSION, NamespaceTables } from '../explorer/metadataCache';
-import { MetadataRequestResult, TARGET_MISMATCH, TargetMismatchParams } from '../ipc';
+import { COOKIE_REFRESH_REQUIRED, CookieRefreshParams, MetadataRequestResult, TARGET_MISMATCH, TargetMismatchParams } from '../ipc';
 
 /** Mirrors `safety.ts`'s own fallback (not exported — see that file's header note on why). */
 const DEFAULT_MAX_ROWS = 1000;
@@ -37,9 +37,13 @@ const DEFAULT_MAX_ROWS = 1000;
 export interface IHeimdallConnectionOptions {
   name: string;
   target: string;
-  authMode: 'service-token' | 'cookie-file';
-  /** Only used in `service-token` mode; `cookie-file` reads the Gatekeeper file automatically. */
-  authHeader?: string;
+  /**
+   * `cookie-file` is the only mode — see `buildAuth()`'s header comment for
+   * why `service-token`/`PATTERN__HEIMDALL_TOKEN` support was removed rather
+   * than just hidden: kept as a literal union of one, not a plain `string`,
+   * so a future re-add is a type-checked one-line change, not a guess.
+   */
+  authMode: 'cookie-file';
 }
 
 function q<R = any>(query: string): IExpectedResult<R> {
@@ -106,59 +110,64 @@ export default class HeimdallDriver extends AbstractDriver<HeimdallClient, IHeim
   };
 
   /**
-   * `cookie-file` mode reads the same Gatekeeper cookie chain as the VS Code
-   * extension (`heimdall-vs-code-ext/src/auth.ts` `resolveAuth`'s cookie
-   * branch) — never typed in, so the connection form's `authHeader` box is
-   * hidden entirely for this mode (see `connection.schema.json`). `resolveAuth`
-   * itself isn't called directly here: it tries `PATTERN__HEIMDALL_TOKEN`
-   * first regardless of mode, which would silently override a user's explicit
-   * "use my cookie file" choice in this UI — so the cookie lookup is inlined
-   * from `auth.ts`'s exported primitives instead.
+   * `cookie-file` is the only auth mode this driver offers (`service-token`
+   * was removed on request — it traded away the headless/remote escape hatch
+   * `heimdall-vs-code-ext/src/auth.ts` built `PATTERN__HEIMDALL_TOKEN` for,
+   * per NFR-8 there; every user of this driver so far is a laptop with a
+   * Gatekeeper cookie, so that trade was accepted deliberately, not an
+   * oversight — re-add by restoring the `'service-token'` arm of
+   * `IHeimdallConnectionOptions.authMode`'s union and this method's old
+   * token branch if a headless/remote use case shows up).
+   *
+   * Reads the same Gatekeeper cookie chain as the VS Code extension
+   * (`heimdall-vs-code-ext/src/auth.ts` `resolveAuth`'s cookie branch) —
+   * never typed in. `resolveAuth` itself isn't called directly here: it
+   * tries `PATTERN__HEIMDALL_TOKEN` first regardless of mode, which no
+   * longer applies now that this driver has exactly one mode — so the
+   * cookie lookup is inlined from `auth.ts`'s exported primitives instead.
    */
   private buildAuth(): HeimdallAuth {
-    const { authMode, authHeader } = this.credentials;
-
-    if (authMode === 'cookie-file') {
-      for (const path of cookieFileCandidates()) {
-        let raw: string;
-        try {
-          raw = readFileSync(path, 'utf8');
-        } catch {
-          continue; // missing/unreadable — try the next location
-        }
-        let parsed: { cookies?: Record<string, string>; when_created?: number };
-        try {
-          parsed = JSON.parse(raw);
-        } catch {
-          throw new Error(`${path} is not valid JSON. Re-create it: run \`mise run agent-sandbox:auth\` in the data-airflow repo.`);
-        }
-        const cookie = buildCookieHeader(parsed.cookies ?? {});
-        if (!cookie) {
-          throw new Error(`${path} has no .cookies entries. Run \`mise run agent-sandbox:auth\` in the data-airflow repo.`);
-        }
-        const age = typeof parsed.when_created === 'number' ? cookieAgeDays(parsed.when_created) : undefined;
-        if (age !== undefined && age > COOKIE_MAX_AGE_DAYS) {
-          this.log.warn(`Gatekeeper cookies in ${path} are ${age.toFixed(1)} days old (stale after ~${COOKIE_MAX_AGE_DAYS}). Queries will likely fail — run \`mise run agent-sandbox:auth\` in the data-airflow repo.`);
-        }
-        return { headers: { Cookie: cookie }, mode: 'cookie-file', source: path };
+    for (const path of cookieFileCandidates()) {
+      let raw: string;
+      try {
+        raw = readFileSync(path, 'utf8');
+      } catch {
+        continue; // missing/unreadable — try the next location
       }
-      throw new Error(
-        `No Gatekeeper cookie file found at: ${cookieFileCandidates().join(', ')}. ` +
-          'Run `mise run agent-sandbox:auth` in the data-airflow repo, or switch this connection to service-token mode.',
-      );
+      let parsed: { cookies?: Record<string, string>; when_created?: number };
+      try {
+        parsed = JSON.parse(raw);
+      } catch {
+        this.requestCookieRefresh('unusable', path);
+        throw new Error(`${path} is not valid JSON. Re-creating it: running \`${REFRESH_CMD}\`.`);
+      }
+      const cookie = buildCookieHeader(parsed.cookies ?? {});
+      if (!cookie) {
+        this.requestCookieRefresh('unusable', path);
+        throw new Error(`${path} has no .cookies entries. Running \`${REFRESH_CMD}\`.`);
+      }
+      const age = typeof parsed.when_created === 'number' ? cookieAgeDays(parsed.when_created) : undefined;
+      if (age !== undefined && age > COOKIE_MAX_AGE_DAYS) {
+        this.log.warn(`Gatekeeper cookies in ${path} are ${age.toFixed(1)} days old (stale after ~${COOKIE_MAX_AGE_DAYS}). Queries will likely fail — running \`${REFRESH_CMD}\`.`);
+        this.requestCookieRefresh('stale', path);
+      }
+      return { headers: { Cookie: cookie }, mode: 'cookie-file', source: path };
     }
+    this.requestCookieRefresh('missing');
+    throw new Error(
+      `No Gatekeeper cookie file found at: ${cookieFileCandidates().join(', ')}. ` +
+        `Running \`${REFRESH_CMD}\` — complete the browser/MFA prompt, then reconnect.`,
+    );
+  }
 
-    // service-token: an explicit value in the connection form wins; otherwise
-    // fall back to the same env var the VS Code extension reads.
-    const token = (authHeader ?? process.env.PATTERN__HEIMDALL_TOKEN ?? '').trim();
-    if (!token) {
-      throw new Error('Auth mode is "service-token" but no token was entered and PATTERN__HEIMDALL_TOKEN is not set.');
-    }
-    return {
-      headers: { 'X-Pattern-Service': token },
-      mode: 'service-token',
-      source: authHeader ? 'connection settings' : 'env PATTERN__HEIMDALL_TOKEN',
-    };
+  /**
+   * Ask the extension host to run cookie-monster (see `../ipc.ts`). This
+   * process has no `vscode` and so can neither open a terminal nor show a
+   * prompt; `extension.ts` owns both, and reuses one named terminal, so
+   * repeated calls from several connections never stack up browser tabs.
+   */
+  private requestCookieRefresh(reason: CookieRefreshParams['reason'], path?: string): void {
+    HeimdallDriver.server?.sendNotification(COOKIE_REFRESH_REQUIRED, <CookieRefreshParams>{ reason, path });
   }
 
   private getTarget() {
@@ -207,18 +216,37 @@ export default class HeimdallDriver extends AbstractDriver<HeimdallClient, IHeim
       let sql = rawStatement;
 
       // FR-6.2/6.3 safety rails (see heimdall/safety.ts's header for why this
-      // is enforced client-side at all). NOTE — no pre-execute confirmation
-      // gate exists in this architecture: SQLTools' driver contract has no
-      // veto hook, so a non-read-only statement below already ran by the time
-      // this warning is attached. See results/NOTES.md for the full
-      // regression writeup; a real fix needs a command-layer wrapper around
-      // `sqltools.executeQuery`, not anything this file can do alone.
+      // is enforced client-side at all).
+      //
+      // Hard block, not confirm-then-run: `extension.ts`'s `gatedExecute`
+      // only covers the two commands it wraps
+      // (`sqltools-driver-heimdall.executeQuery`/`executeCurrentQuery`) —
+      // Run from History, Run from Bookmarks, and right-click "Show Records"
+      // all call SQLTools' native `sqltools.executeQuery` directly, bypassing
+      // that wrapper entirely. This is the one place every path funnels
+      // through (`AbstractDriver.query()`), so it's the only place a real
+      // guarantee can live. `client.runJob` is never called for a blocked
+      // statement — it never reaches Heimdall at all, not even to be warned
+      // about after the fact. Read-only only, for now; see `driver.heimdall`
+      // README for the reasoning and how to widen this later.
       if (!isReadOnly(sql)) {
-        warnings.push(
-          'Not read-only (write/DDL/unrecognised statement) — this ran with no confirmation step; ' +
-            'SQLTools drivers have no pre-execute veto hook. See driver.heimdall/src/results/NOTES.md.',
-        );
-      } else if (isSessionStatement(sql)) {
+        resultsAgg.push(<NSDatabase.IResult>{
+          requestId,
+          resultId: generateId(),
+          connId: this.getId(),
+          query: sql,
+          cols: [],
+          results: [],
+          error: true,
+          messages: [
+            'Blocked: only read-only statements (SELECT/SHOW/DESCRIBE/EXPLAIN/WITH) are allowed on ' +
+              'Heimdall connections right now. This statement was never submitted to Heimdall.',
+          ],
+        });
+        continue;
+      }
+
+      if (isSessionStatement(sql)) {
         warnings.push(
           'USE/SET/ALTER SESSION only affects this job — every job gets a fresh session (FR-8), ' +
             'so this has no effect beyond the statement that ran it.',
@@ -383,6 +411,32 @@ export default class HeimdallDriver extends AbstractDriver<HeimdallClient, IHeim
         database: table.database,
         table,
       }));
+  }
+
+  /**
+   * Bug fix: never implemented — `AbstractDriver`'s default just logs an
+   * error and returns `""`, so right-click a table -> "Generate Definition
+   * Query" silently produced nothing. Spark's `SHOW CREATE TABLE` returns
+   * exactly one row/one column holding the full DDL text (column name isn't
+   * standardized across Spark versions — `createtab_stmt` is common, hence
+   * reading the row's only value positionally rather than by name, same
+   * defensive spirit as `firstString` elsewhere in this file).
+   * `DefinableItem` also covers functions/procedures/indexes/triggers, none
+   * of which Heimdall's object explorer exposes (only tables/columns) — a
+   * clear error for those instead of silently returning nothing.
+   */
+  public async getDefinitionForItem({ item }: { item: NSDatabase.DefinableItem }): Promise<string> {
+    if (item.type !== ContextValue.TABLE) {
+      throw new Error('Heimdall: "Generate Definition Query" only supports tables.');
+    }
+    const table = item as NSDatabase.ITable;
+    const result = await this.singleQuery(q(`SHOW CREATE TABLE ${quoteSpark(`${table.schema}.${table.label}`)}`), {});
+    if (result.error) {
+      throw result.rawError;
+    }
+    const rows = result.results as unknown as Record<string, unknown>[];
+    const value = rows[0] ? Object.values(rows[0])[0] : undefined;
+    return typeof value === 'string' ? value : '';
   }
 
   public async getChildrenForItem({ item, parent }: Arg0<IConnectionDriver['getChildrenForItem']>): Promise<MConnectionExplorer.IChildItem[]> {

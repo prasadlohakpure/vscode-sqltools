@@ -1,0 +1,9 @@
+.vscode/**
+src/**
+test/**
+out-test/**
+ai-dlc/**
+**/tsconfig.json
+**/*.map
+**/*.ts
+*.log

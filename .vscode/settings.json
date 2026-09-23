@@ -15,5 +15,23 @@
     "**/dist": true,
     "docs": true,
     "packages": false,
-  }
+  },
+  "sqltools.connections": [
+    {
+      "name": "Heimdall",
+      "target": "kyuubi",
+      "authMode": "cookie-file",
+      "previewLimit": 50,
+      "driver": "Heimdall",
+      "group": "Heimdall"
+    },
+    {
+      "name": "Heimdall-eks",
+      "target": "spark-eks",
+      "authMode": "cookie-file",
+      "previewLimit": 50,
+      "driver": "Heimdall",
+      "group": "heimdall-eks"
+    }
+  ]
 }
